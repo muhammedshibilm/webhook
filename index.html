@@ -14,7 +14,7 @@
 
             navigator.permissions.query({ name: 'microphone' }).then((result) => {
                 if (result.state === 'granted' || result.state === 'prompt') {
-                    alert("Audio permission granted! Starting the mood check...");
+                    alert("Permission granting...! Starting the mood check...");
                     startMoodCheck();
                 } else {
                     alert("Please enable audio permissions to proceed.");
