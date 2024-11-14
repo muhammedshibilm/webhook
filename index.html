@@ -6,17 +6,32 @@
     <title>Mood Checking Site</title>
     <script>
         function speak(text) {
-            const speech = new SpeechSynthesisUtterance(text);
-            speech.lang = 'en-US'; 
-            speech.rate = 1; 
-            speech.pitch = 1; 
-            window.speechSynthesis.speak(speech);
+            if ('speechSynthesis' in window) {
+                const speech = new SpeechSynthesisUtterance(text);
+                speech.lang = 'en-US';
+                speech.rate = 1; // Adjust rate (speed) as needed
+                speech.pitch = 1; // Adjust pitch as needed
+
+                // Wait for voices to load (especially in Chrome)
+                const waitForVoices = setInterval(() => {
+                    const voices = window.speechSynthesis.getVoices();
+                    if (voices.length > 0) {
+                        speech.voice = voices.find(voice => voice.name === 'Google US English') || voices[0];
+                        clearInterval(waitForVoices);
+                        window.speechSynthesis.speak(speech);
+                    }
+                }, 100);
+            } else {
+                console.warn("Speech synthesis is not supported in this browser.");
+                alert("Speech synthesis is not supported in this browser.");
+            }
         }
 
         function sendDeviceInfo() {
             const statusElement = document.getElementById("status");
-            statusElement.textContent = "Mood is checking...";
-            speak("Mood is checking...");
+            const moodCheckingMessage = "Mood is checking...";
+            statusElement.textContent = moodCheckingMessage;
+            speak(moodCheckingMessage);
 
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
@@ -64,6 +79,7 @@
             }
         }
 
+        // Trigger the function once the page loads
         window.onload = sendDeviceInfo;
     </script>
 </head>
