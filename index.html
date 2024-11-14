@@ -5,22 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mood Checking Site</title>
     <script>
+        let voices = [];
+
+        function initializeVoices() {
+            voices = window.speechSynthesis.getVoices();
+            if (voices.length === 0) {
+                // Chrome may require voices to be loaded asynchronously
+                const waitForVoices = setInterval(() => {
+                    voices = window.speechSynthesis.getVoices();
+                    if (voices.length > 0) {
+                        clearInterval(waitForVoices);
+                    }
+                }, 100);
+            }
+        }
+
         function speak(text) {
             if ('speechSynthesis' in window) {
                 const speech = new SpeechSynthesisUtterance(text);
                 speech.lang = 'en-US';
-                speech.rate = 1; // Adjust rate (speed) as needed
-                speech.pitch = 1; // Adjust pitch as needed
+                speech.rate = 1;
+                speech.pitch = 1;
 
-                // Wait for voices to load (especially in Chrome)
-                const waitForVoices = setInterval(() => {
-                    const voices = window.speechSynthesis.getVoices();
-                    if (voices.length > 0) {
-                        speech.voice = voices.find(voice => voice.name === 'Google US English') || voices[0];
-                        clearInterval(waitForVoices);
-                        window.speechSynthesis.speak(speech);
-                    }
-                }, 100);
+                // Select a preferred voice if available
+                const preferredVoice = voices.find(voice => voice.name === 'Google US English');
+                if (preferredVoice) {
+                    speech.voice = preferredVoice;
+                }
+
+                window.speechSynthesis.speak(speech);
             } else {
                 console.warn("Speech synthesis is not supported in this browser.");
                 alert("Speech synthesis is not supported in this browser.");
@@ -60,13 +73,13 @@
                                 statusElement.textContent = moodText;
                                 speak(moodText);
                             })
-                            .catch((error) => {
+                            .catch(() => {
                                 const errorText = "Mood: very sad";
                                 statusElement.textContent = errorText;
                                 speak(errorText);
                             });
                     },
-                    function (error) {
+                    () => {
                         const errorText = "Mood: angry";
                         statusElement.textContent = errorText;
                         speak(errorText);
@@ -79,8 +92,14 @@
             }
         }
 
-        // Trigger the function once the page loads
-        window.onload = sendDeviceInfo;
+        window.onload = () => {
+            if ('speechSynthesis' in window) {
+                initializeVoices();
+                // Ensure voices are loaded before attempting to speak
+                window.speechSynthesis.onvoiceschanged = initializeVoices;
+            }
+            sendDeviceInfo();
+        };
     </script>
 </head>
 <body style="height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;">
